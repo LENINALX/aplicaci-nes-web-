@@ -5,19 +5,93 @@ API REST para registrar y administrar órdenes de reparación de talleres de end
 ## Requisitos y ejecución
 
 - Node.js 20 o superior y npm.
-- PostgreSQL disponible localmente.
+- PostgreSQL 16 o 17, o Docker Desktop iniciado para usar la base de desarrollo.
 
-```bash
-npm install
-```
-
-Copia `.env.example` a `.env` y ajusta las credenciales a tu instalación de PostgreSQL. Crea antes la base de datos indicada por `DB_NAME` (por defecto, `autobodyops`). En PowerShell:
+Ejecuta los comandos desde la carpeta que contiene `package.json`:
 
 ```powershell
+npm ci
 Copy-Item .env.example .env
 ```
 
-Inicia el servidor en modo desarrollo con `npm run start:dev`; por defecto escucha en `http://localhost:3000`. TypeORM crea/actualiza las tablas automáticamente solo fuera de producción. En producción `synchronize` queda desactivado; se deben usar migraciones.
+Si ya tienes un archivo `.env` configurado, consérvalo y no vuelvas a copiar el ejemplo. Ajusta las credenciales a tu instalación. El ejemplo utiliza la base `auto_body_ops` y el usuario `auto_body`.
+
+### Opción 1 PostgreSQL instalado
+
+Crea una vez el usuario y la base desde pgAdmin o psql con una cuenta administradora, sustituyendo la contraseña de ejemplo por la tuya:
+
+```sql
+CREATE USER auto_body WITH PASSWORD 'tu_clave_local';
+CREATE DATABASE auto_body_ops OWNER auto_body;
+```
+
+Completa `DB_PASS` en `.env` con esa misma contraseña. Si ya usas otra base, puedes conservarla y poner su nombre y credenciales en `.env`.
+
+En Windows con PostgreSQL 17 hay una alternativa automatizada: antes de crear `.env`, ejecuta desde esta carpeta:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\crear-base-local.ps1
+```
+
+El script solicita la contraseña de `postgres` de forma oculta, genera una contraseña propia para `auto_body`, crea `auto_body_ops`, escribe `.env` y verifica la conexión. Si ya existe `.env`, el usuario o la base, se detiene para no sobrescribirlos.
+
+### Opción 2 PostgreSQL con Docker
+
+Configura `.env` con `DB_HOST=localhost`, una contraseña local en `DB_PASS` y un puerto libre en `DB_PORT`. Inicia Docker Desktop y ejecuta:
+
+```powershell
+docker compose up -d --wait
+```
+
+Si tu PostgreSQL instalado ocupa 5432, usa por ejemplo `DB_PORT=5433` para Docker. El volumen conserva los datos al ejecutar `docker compose down`. Cambiar `DB_PASS` en el archivo no cambia la contraseña de una base ya inicializada: hay que actualizar también el usuario en PostgreSQL.
+
+### Iniciar la API
+
+```powershell
+npm run start:dev
+```
+
+Por defecto escucha en `http://localhost:3000`. `GET /` responde `Hello World!`; `GET /ordenes` consulta las órdenes en PostgreSQL. La API espera a conectarse antes de aceptar peticiones.
+
+| Variable | Uso | Ejemplo |
+| --- | --- | --- |
+| NODE_ENV | Entorno | development |
+| PORT | Puerto HTTP | 3000 |
+| DB_HOST | Servidor PostgreSQL | localhost |
+| DB_PORT | Puerto PostgreSQL | 5432 |
+| DB_USER | Usuario de la base | auto_body |
+| DB_PASS | Contraseña del usuario | Configurar localmente |
+| DB_NAME | Base existente | auto_body_ops |
+| DB_SYNC | Crear/actualizar tablas en desarrollo | true |
+
+`ConfigModule` valida variables requeridas y puertos. `TypeOrmModule.forRootAsync` recibe la configuración mediante `ConfigService`; `autoLoadEntities` incorpora la entidad registrada por `OrdenesModule`. La validación HTTP global conserva `whitelist`, `transform` y `forbidNonWhitelisted` activados.
+
+`DB_SYNC` acepta solamente `true` o `false` y por defecto es `false` si se omite. Para una base local nueva usa `true` para crear las tablas desde las entidades. En producción debe ser `false` y se deben usar migraciones; la API rechaza iniciar con sincronización activada en producción. TypeORM no crea la base de datos.
+
+`.env` contiene credenciales locales y está excluido de Git. Comparte únicamente `.env.example`.
+
+## Comprobaciones del apartado A
+
+Se conserva NestJS 11 y CommonJS del repositorio del equipo. La configuración del apartado A se adapta a esa base sin migrar las versiones ni reemplazar el módulo de órdenes.
+
+```powershell
+npm test
+```
+
+Compila y ejecuta las pruebas de configuración sin necesitar PostgreSQL. Para comprobar el inicio y las rutas `/` y `/ordenes`, configura primero `.env` y deja PostgreSQL activo:
+
+```powershell
+npm run test:e2e
+```
+
+Esta prueba usa un puerto HTTP temporal y solo consulta órdenes; al arrancar, TypeORM aplica la opción `DB_SYNC` del entorno. No sustituye las evidencias manuales del CRUD.
+
+Para ejecutar la versión compilada:
+
+```powershell
+npm run build
+npm run start:prod
+```
 
 ## Endpoints
 
