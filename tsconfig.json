@@ -4,6 +4,7 @@
     "target": "ES2021",
     "outDir": "./dist",
     "baseUrl": "./",
+    "nodeModule": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
   }
