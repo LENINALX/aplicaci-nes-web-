@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { EstadoOrden } from '../enums/estado-orden.enum';
 import { TipoServicio } from '../enums/tipo-servicio.enum';
@@ -54,27 +55,27 @@ export class CreateOrdenDto {
   @IsNotEmpty()
   descripcionDanio: string;
 
-  // Si no se envía, la entidad asigna RECIBIDO
-  @IsOptional()
+  // Se puede omitir para usar RECIBIDO, pero no enviar null.
+  @ValidateIf((_, value) => value !== undefined)
   @IsEnum(EstadoOrden)
   estado?: EstadoOrden;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(99999999.99)
   costoEstimado?: number;
 
   // Formato YYYY-MM-DD; si no se envía, se usa la fecha actual
-  @IsOptional()
-  @IsDateString()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsDateString({ strict: true })
   fechaIngreso?: string;
 
   @IsOptional()
-  @IsDateString()
-  fechaEstimadaEntrega?: string;
+  @IsDateString({ strict: true })
+  fechaEstimadaEntrega?: string | null;
 
   @IsOptional()
   @IsString()
-  notas?: string;
+  notas?: string | null;
 }
