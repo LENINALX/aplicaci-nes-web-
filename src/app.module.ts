@@ -5,7 +5,9 @@ import { typeOrmConfig } from './config/typeorm.config';
 import { validateEnvironment } from './config/env.validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ClientesModule } from './clientes/clientes.module';
 import { OrdenesModule } from './ordenes/ordenes.module';
+import { VehiculosModule } from './vehiculos/vehiculos.module';
 
 @Module({
 	imports: [
@@ -16,6 +18,8 @@ import { OrdenesModule } from './ordenes/ordenes.module';
 			useFactory: typeOrmConfig,
 		}),
 		OrdenesModule,
+		ClientesModule,
+		VehiculosModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
