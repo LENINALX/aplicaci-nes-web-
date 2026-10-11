@@ -4,7 +4,7 @@ Rama de trabajo: `feature/guards-migrations`.
 
 ## Alcance e integración
 
-`JwtAuthGuard` protege POST, PATCH y DELETE de `/ordenes`. GET permanece público. No existe PUT en el CRUD actual; si se añade, debe llevar `@UseGuards(JwtAuthGuard)`. Los nuevos controladores de dominio deben importar `SecurityModule` en su módulo y colocar ese decorador en sus operaciones de escritura.
+`JwtAuthGuard` protege POST, PATCH y DELETE de `/ordenes`, `/clientes` y `/vehiculos`. GET permanece público. No existe PUT en el CRUD actual; si se añade, debe llevar `@UseGuards(JwtAuthGuard)`. Los nuevos controladores de dominio deben importar `SecurityModule` en su módulo y colocar ese decorador en sus operaciones de escritura.
 
 El guard usa `@nestjs/jwt` para verificar tokens, sin necesitar implementar la estrategia Passport, registro ni login del integrante 1. Contrato de integración con Auth:
 
@@ -68,3 +68,24 @@ Guardar capturas reales ocultando el token y los secretos. No se incluyen captur
 Para GitHub, los cambios están en la rama asignada; crear commits propios y un PR hacia la rama que use el equipo. El PR debe describir estos cambios y sus pruebas, y pedir revisión a un compañero. El README general sigue a cargo del integrante 4; debe actualizar el antiguo flujo basado en `DB_SYNC=true` y añadir las instrucciones de migración y Authorization de esta nota.
 
 Referencias técnicas: [guards en NestJS](https://docs.nestjs.com/guards) y [CLI de TypeORM](https://typeorm.io/docs/using-cli/).
+
+## Verificación con PostgreSQL real — 11 de octubre de 2026
+
+Se actualizaron los commits de `origin/main` hasta `d6dd3b9`. En esa versión faltaban la protección de escritura de clientes/vehículos y su migración; ambos puntos se completaron sin cambiar el diseño de las entidades del integrante 3.
+
+Se generó `1791758931257-CreateClientesVehiculos.ts` con el CLI contra PostgreSQL 16. Además de las tablas y su clave foránea, normaliza el valor predeterminado de fechaIngreso a la expresión equivalente que espera TypeORM.
+
+Comprobaciones realizadas en PostgreSQL 16 temporal, sin datos reales:
+
+- Aplicación de las tres migraciones desde una base vacía y repetición sin duplicarlas.
+- Comparación del esquema con las entidades: cero diferencias; `migration:generate --check` correcto.
+- Reversión de todas las migraciones y reaplicación desde JavaScript compilado, siempre con `synchronize=false`.
+- Registro y login reales con persistencia en PostgreSQL.
+- En órdenes, clientes y vehículos: 401 sin token o con token inválido, POST 201, PATCH 200 y DELETE 204 con el token del login.
+- Persistencia de las modificaciones después de reiniciar la aplicación.
+
+La prueba reproducible está en `test/migrations.e2e.cjs`. Para ejecutarla, configurar las variables DB_* de una instancia de prueba y usar `npm run test:migrations`. El usuario PostgreSQL necesita permiso CREATEDB: la prueba crea una base de nombre aleatorio y elimina exclusivamente esa base al terminar. No requiere configurar JWT_SECRET: genera un secreto temporal solo para esta prueba.
+
+`npm test` ejecuta por separado las pruebas de configuración, seguridad, autenticación y CRUD sin necesitar PostgreSQL. La prueba real se invoca explícitamente con `npm run test:migrations`.
+
+La validación técnica del punto 2 queda completada. La revisión/aprobación de un PR por otro integrante es una evidencia de equipo, no una comprobación que pueda sustituir esta prueba.
