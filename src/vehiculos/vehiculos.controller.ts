@@ -1,3 +1,4 @@
+import { JwtAuthGuard } from '../security/jwt-auth.guard';
 import {
   Body,
   Controller,
@@ -9,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { UpdateVehiculoDto } from './dto/update-vehiculo.dto';
@@ -29,11 +31,13 @@ export class VehiculosController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   create(@Body() createVehiculoDto: CreateVehiculoDto) {
     return this.vehiculosService.create(createVehiculoDto);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() updateVehiculoDto: UpdateVehiculoDto,
@@ -42,6 +46,7 @@ export class VehiculosController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.vehiculosService.remove(id);
