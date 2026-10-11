@@ -30,6 +30,10 @@ try {
     Invoke-LocalSql "CREATE ROLE auto_body LOGIN PASSWORD '$appPassword';" | Out-Null
     Invoke-LocalSql 'CREATE DATABASE auto_body_ops OWNER auto_body;' | Out-Null
 
+    $jwtBytes = New-Object byte[] 32
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($jwtBytes) } finally { $rng.Dispose() }
+    $jwtSecret = [BitConverter]::ToString($jwtBytes).Replace('-', '').ToLowerInvariant()
     $env:PGPASSWORD = $appPassword
     @(
         'NODE_ENV=development'
@@ -39,13 +43,14 @@ try {
         'DB_USER=auto_body'
         "DB_PASS=$appPassword"
         'DB_NAME=auto_body_ops'
-        'DB_SYNC=true'
+        'DB_SYNC=false'
+        "JWT_SECRET=$jwtSecret"
     ) | Set-Content -LiteralPath $envPath -Encoding ascii
 
     $connection = Invoke-LocalSql 'SELECT current_database() || '' / '' || current_user;' 'auto_body_ops' 'auto_body'
     Write-Host "Conexión verificada: $connection"
     Write-Host 'Base creada y configuración guardada en .env (excluido de Git).'
-    Write-Host 'Ahora puedes ejecutar: npm run start:dev'
+    Write-Host 'Ahora ejecuta: npm run migration:run y luego npm run start:dev'
 } finally {
     $env:PGPASSWORD = $previousPassword
     $env:PGCONNECT_TIMEOUT = $previousTimeout

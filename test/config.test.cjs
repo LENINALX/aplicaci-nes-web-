@@ -6,7 +6,7 @@ const { typeOrmConfig } = require('../dist/config/typeorm.config');
 const { AppController } = require('../dist/app.controller');
 const { AppService } = require('../dist/app.service');
 
-const valid = { DB_HOST: 'localhost', DB_USER: 'test', DB_PASS: 'test-only', DB_NAME: 'test' };
+const valid = { DB_HOST: 'localhost', DB_USER: 'test', DB_PASS: 'test-only', DB_NAME: 'test', JWT_SECRET: 'test-secret-at-least-32-characters-long' };
 
 test('convierte puertos y no interpreta false como verdadero', () => {
   const env = validateEnvironment({ ...valid, DB_PORT: '5433', DB_SYNC: 'false' });
@@ -15,9 +15,9 @@ test('convierte puertos y no interpreta false como verdadero', () => {
   assert.equal(env.DB_SYNC, false);
 });
 
-test('sincroniza únicamente cuando se solicita explícitamente', () => {
+test('exige migraciones también en desarrollo', () => {
   assert.equal(validateEnvironment(valid).DB_SYNC, false);
-  assert.equal(validateEnvironment({ ...valid, DB_SYNC: 'true' }).DB_SYNC, true);
+  assert.throws(() => validateEnvironment({ ...valid, DB_SYNC: 'true' }), /DB_SYNC/);
 });
 
 for (const key of ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME']) {
@@ -33,7 +33,7 @@ for (const port of ['0', '65536', 'abc', '3.5', '']) {
 }
 
 test('impide sincronizar en producción', () => {
-  assert.throws(() => validateEnvironment({ ...valid, NODE_ENV: 'production', DB_SYNC: 'true' }), /producción/);
+  assert.throws(() => validateEnvironment({ ...valid, NODE_ENV: 'production', DB_SYNC: 'true' }), /DB_SYNC/);
 });
 
 test('TypeORM utiliza las variables validadas y registra entidades de los módulos', () => {
@@ -49,3 +49,9 @@ test('TypeORM utiliza las variables validadas y registra entidades de los módul
 test('conserva la respuesta inicial del apartado A', () => {
   assert.equal(new AppController(new AppService()).getHello(), 'Hello World!');
 });
+
+for (const value of [undefined, '', 'corto', ' '.repeat(40)]) {
+  test(`rechaza JWT_SECRET inválido: ${JSON.stringify(value)}`, () => {
+    assert.throws(() => validateEnvironment({ ...valid, JWT_SECRET: value }), /JWT_SECRET/);
+  });
+}

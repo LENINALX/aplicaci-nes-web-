@@ -9,7 +9,7 @@ import { OrdenesModule } from './ordenes/ordenes.module';
 
 @Module({
 	imports: [
-		ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
+		ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnvironment }),
 		TypeOrmModule.forRootAsync({
 			imports: [ConfigModule],
 			inject: [ConfigService],

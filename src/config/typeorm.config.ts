@@ -1,7 +1,10 @@
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import type { DataSourceOptions } from 'typeorm';
+import { join } from 'node:path';
 
-export function typeOrmConfig(config: ConfigService): TypeOrmModuleOptions {
+// Una misma configuración para Nest y el CLI, en src (TS) y dist (JS).
+export function databaseOptions(config: ConfigService): DataSourceOptions {
   return {
     type: 'postgres',
     host: config.getOrThrow<string>('DB_HOST'),
@@ -9,8 +12,14 @@ export function typeOrmConfig(config: ConfigService): TypeOrmModuleOptions {
     username: config.getOrThrow<string>('DB_USER'),
     password: config.getOrThrow<string>('DB_PASS'),
     database: config.getOrThrow<string>('DB_NAME'),
-    autoLoadEntities: true,
-    // Activar únicamente en desarrollo local; producción requiere migraciones.
-    synchronize: config.getOrThrow<boolean>('DB_SYNC'),
+    entities: [join(__dirname, '..', '**', '*.entity.{ts,js}')],
+    migrations: [join(__dirname, '..', 'migrations', '*.{ts,js}')],
+    migrationsTableName: 'typeorm_migrations',
+    synchronize: false,
+    migrationsRun: false,
   };
+}
+
+export function typeOrmConfig(config: ConfigService): TypeOrmModuleOptions {
+  return { ...databaseOptions(config), autoLoadEntities: true };
 }

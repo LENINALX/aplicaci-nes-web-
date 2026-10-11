@@ -1,4 +1,4 @@
-export function validateEnvironment(env: Record<string, unknown>) {
+export function validateDatabaseEnvironment(env: Record<string, unknown>) {
   const result = { ...env };
   for (const key of ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME']) {
     if (typeof env[key] !== 'string' || !env[key].trim()) {
@@ -17,13 +17,17 @@ export function validateEnvironment(env: Record<string, unknown>) {
     }
     result[key] = value;
   }
-  const sync = env.DB_SYNC ?? 'false';
-  if (sync !== 'true' && sync !== 'false') {
-    throw new Error('DB_SYNC debe ser true o false.');
+  if (env.DB_SYNC !== undefined && env.DB_SYNC !== 'false') {
+    throw new Error('DB_SYNC debe ser false. Usa las migraciones en todos los entornos.');
   }
-  if (env.NODE_ENV === 'production' && sync === 'true') {
-    throw new Error('DB_SYNC debe ser false en producción.');
+  result.DB_SYNC = false;
+  return result;
+}
+
+export function validateEnvironment(env: Record<string, unknown>) {
+  const result = validateDatabaseEnvironment(env);
+  if (typeof env.JWT_SECRET !== 'string' || env.JWT_SECRET.trim().length < 32) {
+    throw new Error('JWT_SECRET debe contener al menos 32 caracteres.');
   }
-  result.DB_SYNC = sync === 'true';
   return result;
 }
