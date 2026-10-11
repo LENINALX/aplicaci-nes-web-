@@ -1,6 +1,6 @@
 # AutoBodyOps API
 
-API REST para registrar y administrar órdenes de reparación de talleres de enderezada y pintura. Está construida con NestJS, PostgreSQL, TypeORM y `class-validator`.
+API REST para administrar clientes, vehículos y órdenes de reparación de talleres de enderezada y pintura. Está construida con NestJS, PostgreSQL, TypeORM y `class-validator`.
 
 ## Requisitos y ejecución
 
@@ -51,7 +51,7 @@ Si tu PostgreSQL instalado ocupa 5432, usa por ejemplo `DB_PORT=5433` para Docke
 npm run start:dev
 ```
 
-Por defecto escucha en `http://localhost:3000`. `GET /` responde `Hello World!`; `GET /ordenes` consulta las órdenes en PostgreSQL. La API espera a conectarse antes de aceptar peticiones.
+Por defecto escucha en `http://localhost:3000`. `GET /` responde `Hello World!`; `GET /ordenes`, `GET /clientes` y `GET /vehiculos` consultan los recursos en PostgreSQL. La API espera a conectarse antes de aceptar peticiones.
 
 | Variable | Uso | Ejemplo |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ Por defecto escucha en `http://localhost:3000`. `GET /` responde `Hello World!`;
 | DB_NAME | Base existente | auto_body_ops |
 | DB_SYNC | Crear/actualizar tablas en desarrollo | true |
 
-`ConfigModule` valida variables requeridas y puertos. `TypeOrmModule.forRootAsync` recibe la configuración mediante `ConfigService`; `autoLoadEntities` incorpora la entidad registrada por `OrdenesModule`. La validación HTTP global conserva `whitelist`, `transform` y `forbidNonWhitelisted` activados.
+`ConfigModule` valida variables requeridas y puertos. `TypeOrmModule.forRootAsync` recibe la configuración mediante `ConfigService`; `autoLoadEntities` incorpora las entidades registradas por los módulos. La validación HTTP global conserva `whitelist`, `transform` y `forbidNonWhitelisted` activados.
 
 `DB_SYNC` acepta solamente `true` o `false` y por defecto es `false` si se omite. Para una base local nueva usa `true` para crear las tablas desde las entidades. En producción debe ser `false` y se deben usar migraciones; la API rechaza iniciar con sincronización activada en producción. TypeORM no crea la base de datos.
 
@@ -95,7 +95,7 @@ npm run start:prod
 
 ## Endpoints
 
-Todos los recursos están bajo `/ordenes`. Los identificadores son UUID versión 4.
+Los identificadores son UUID versión 4.
 
 | Método | Ruta | Descripción | Respuesta exitosa |
 | --- | --- | --- | --- |
@@ -104,8 +104,21 @@ Todos los recursos están bajo `/ordenes`. Los identificadores son UUID versión
 | POST | `/ordenes` | Crea una orden; el sistema genera `id` y `codigo` | `201 Created` |
 | PATCH | `/ordenes/:id` | Actualiza solo los campos enviados | `200 OK` |
 | DELETE | `/ordenes/:id` | Elimina una orden | `204 No Content` |
+| GET | `/clientes` | Lista clientes | `200 OK` |
+| GET | `/clientes/:id` | Consulta un cliente | `200 OK` |
+| POST | `/clientes` | Crea un cliente | `201 Created` |
+| PATCH | `/clientes/:id` | Actualiza solo los campos enviados | `200 OK` |
+| DELETE | `/clientes/:id` | Elimina un cliente sin vehículos asociados | `204 No Content` |
+| GET | `/clientes/:id/vehiculos` | Consulta los vehículos asociados a un cliente | `200 OK` |
+| GET | `/vehiculos` | Lista vehículos con sus datos de cliente | `200 OK` |
+| GET | `/vehiculos/:id` | Consulta un vehículo con sus datos de cliente | `200 OK` |
+| POST | `/vehiculos` | Crea un vehículo asociado mediante `clienteId` | `201 Created` |
+| PATCH | `/vehiculos/:id` | Actualiza datos del vehículo o cambia su cliente | `200 OK` |
+| DELETE | `/vehiculos/:id` | Elimina un vehículo | `204 No Content` |
 
 Errores esperados: `400 Bad Request` para datos inválidos o un UUID mal formado; `404 Not Found` si el UUID es válido pero no existe. El `PATCH` puede recibir cualquier subconjunto de los campos de creación. `id`, `codigo`, `tenantId`, `createdAt` y `updatedAt` no se aceptan en el cuerpo de creación/actualización.
+
+Los DTOs de clientes validan nombre, teléfono y correo electrónico opcional. Los DTOs de vehículos validan placa (5 a 10 letras mayúsculas, números o guiones), marca, modelo, año y `clienteId` UUID versión 4. No se aceptan propiedades adicionales. Cada vehículo requiere un cliente existente; la base de datos aplica `ON DELETE RESTRICT`, y la API responde `409 Conflict` si se intenta eliminar un cliente que todavía tiene vehículos.
 
 ### Ejemplo de creación
 
@@ -138,11 +151,19 @@ En Thunder Client, Insomnia o Postman, configura la URL base `http://localhost:3
 5. Prueba `GET /ordenes/00000000-0000-4000-8000-000000000000`. Comprueba `404` (UUID válido que no existe).
 6. `DELETE /ordenes/<id>`. Comprueba `204`; un `GET` posterior debe devolver `404`.
 
+### Clientes y vehículos
+
+1. `POST /clientes` con `{"nombreCompleto":"Ana Pérez","telefono":"+593991234567","email":"ana@example.com"}` y guarda el `id`.
+2. `POST /vehiculos` con `{"placa":"ABC1234","marca":"Toyota","modelo":"Corolla","anio":2020,"clienteId":"<id-del-cliente>"}`.
+3. `GET /clientes/<id-del-cliente>/vehiculos`. Comprueba que el vehículo creado aparezca en la respuesta.
+4. Intenta eliminar el cliente asociado con `DELETE /clientes/<id-del-cliente>`: debe responder `409`. Elimina el vehículo y vuelve a probar; debe responder `204`.
+5. Repite `POST /vehiculos` con un `clienteId` inexistente y comprueba `404`; envía un año inválido o una propiedad no permitida y comprueba `400`.
+
 Para demostrar persistencia, crea otra orden y conserva su `id`; detén y vuelve a iniciar la API sin borrar ni recrear la base de datos, luego ejecuta `GET /ordenes/<id>`. Debe responder `200` con la orden original. La persistencia la proporciona PostgreSQL, no la memoria del proceso NestJS.
 
 ## Evidencias
 
-Guarda capturas reales de Thunder Client/Insomnia/Postman y del reinicio más la consulta posterior en [docs/evidencias](docs/evidencias/). Incluye como mínimo: creación (`201`), listado o consulta (`200`), validación (`400`), no encontrado (`404`), eliminación (`204`) y persistencia después del reinicio (`200`). Nombra cada captura indicando operación y resultado, por ejemplo `01-post-201.png` y `06-persistencia-reinicio-200.png`. No incluyas contraseñas ni otros secretos visibles en las capturas.
+Guarda capturas reales de Thunder Client/Insomnia/Postman y del reinicio más la consulta posterior en [docs/evidencias](docs/evidencias/). Incluye como mínimo: creación (`201`), listado o consulta (`200`), validación (`400`), no encontrado (`404`), eliminación (`204`), consulta de vehículos por cliente, rechazo al eliminar un cliente con vehículos (`409`) y persistencia después del reinicio (`200`). Nombra cada captura indicando operación y resultado, por ejemplo `01-post-201.png` y `06-persistencia-reinicio-200.png`. No incluyas contraseñas ni otros secretos visibles en las capturas.
 
 ## Material para el informe Word
 
