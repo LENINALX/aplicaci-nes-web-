@@ -5,6 +5,7 @@ import { typeOrmConfig } from './config/typeorm.config';
 import { validateEnvironment } from './config/env.validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { ClientesModule } from './clientes/clientes.module';
 import { OrdenesModule } from './ordenes/ordenes.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
@@ -20,6 +21,7 @@ import { VehiculosModule } from './vehiculos/vehiculos.module';
 		OrdenesModule,
 		ClientesModule,
 		VehiculosModule,
+		AuthModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
