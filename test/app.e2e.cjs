@@ -39,7 +39,9 @@ test('arranca con PostgreSQL y conserva las rutas de base y órdenes', { timeout
     assert.ok(ready, `La API no estuvo disponible:\n${logs}`);
     const response = await fetch(`http://127.0.0.1:${port}/ordenes`, { signal: AbortSignal.timeout(5000) });
     assert.equal(response.status, 200);
-    assert.ok(Array.isArray(await response.json()));
+    const body = await response.json();
+    assert.ok(Array.isArray(body.data));
+    assert.deepEqual(Object.keys(body.meta).sort(), ['limit', 'page', 'totalItems', 'totalPages']);
   } finally {
     if (api.exitCode === null) {
       const closed = once(api, 'close');

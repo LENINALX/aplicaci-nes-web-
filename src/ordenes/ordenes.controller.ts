@@ -1,7 +1,20 @@
 import { JwtAuthGuard } from '../security/jwt-auth.guard';
-import { Body,Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards}
-from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	HttpCode,
+	HttpStatus,
+	Param,
+	ParseUUIDPipe,
+	Patch,
+	Post,
+	Query,
+	UseGuards,
+} from '@nestjs/common';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { UpdateOrdenDto } from './dto/update-orden.dto';
 import { OrdenesService } from './ordenes.service';
 
@@ -10,8 +23,8 @@ export class OrdenesController {
 	constructor(private readonly ordenesService: OrdenesService) {}
 
 	@Get()
-	findAll() {
-		return this.ordenesService.findAll();
+	findAll(@Query() query: PaginationQueryDto) {
+		return this.ordenesService.findAll(query);
 	}
 
 	@Get(':id')

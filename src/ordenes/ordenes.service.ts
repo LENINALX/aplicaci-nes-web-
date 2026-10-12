@@ -3,8 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import {
+	OrdenesSortBy,
+	PaginationQueryDto,
+	SortOrder,
+} from './dto/pagination-query.dto';
 import { UpdateOrdenDto } from './dto/update-orden.dto';
 import { OrdenReparacion } from './entities/orden-reparacion.entity';
+
+const sortColumns: Record<OrdenesSortBy, string> = {
+	[OrdenesSortBy.CODIGO]: 'orden.codigo',
+	[OrdenesSortBy.FECHA_INGRESO]: 'orden.fechaIngreso',
+	[OrdenesSortBy.CREATED_AT]: 'orden.createdAt',
+	[OrdenesSortBy.COSTO_ESTIMADO]: 'orden.costoEstimado',
+};
 
 @Injectable()
 export class OrdenesService {
@@ -13,8 +25,61 @@ export class OrdenesService {
 		private readonly ordenesRepository: Repository<OrdenReparacion>,
 	) {}
 
-	findAll(): Promise<OrdenReparacion[]> {
-		return this.ordenesRepository.find({ order: { createdAt: 'DESC' } });
+	async findAll(query: PaginationQueryDto): Promise<{
+		data: OrdenReparacion[];
+		meta: {
+			totalItems: number;
+			totalPages: number;
+			page: number;
+			limit: number;
+		};
+	}> {
+		const { page, limit } = query;
+		const queryBuilder = this.ordenesRepository.createQueryBuilder('orden');
+
+		if (query.estado) {
+			queryBuilder.andWhere('orden.estado = :estado', {
+				estado: query.estado,
+			});
+		}
+		if (query.tipoServicio) {
+			queryBuilder.andWhere('orden.tipoServicio = :tipoServicio', {
+				tipoServicio: query.tipoServicio,
+			});
+		}
+		if (query.q?.trim()) {
+			queryBuilder.andWhere(
+				`(
+					"orden"."codigo" ILIKE :search OR
+					"orden"."placaVehiculo" ILIKE :search OR
+					"orden"."marca" ILIKE :search OR
+					"orden"."modelo" ILIKE :search OR
+					"orden"."nombreCliente" ILIKE :search OR
+					"orden"."descripcionDanio" ILIKE :search
+				)`,
+				{ search: `%${query.q.trim()}%` },
+			);
+		}
+
+		const [data, totalItems] = await queryBuilder
+			.orderBy(
+				sortColumns[query.sortBy ?? OrdenesSortBy.CREATED_AT],
+				query.sortOrder ?? SortOrder.DESC,
+			)
+			.addOrderBy('orden.id', 'ASC')
+			.skip((page - 1) * limit)
+			.take(limit)
+			.getManyAndCount();
+
+		return {
+			data,
+			meta: {
+				totalItems,
+				totalPages: Math.ceil(totalItems / limit),
+				page,
+				limit,
+			},
+		};
 	}
 
 	async findOne(id: string): Promise<OrdenReparacion> {
