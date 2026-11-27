@@ -15,6 +15,7 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts",
     "migration:run:prod": "typeorm migration:run -d dist/data-source.js",
+    "seed:admin": "ts-node src/scripts/seed-admin.ts",
     "test:migrations": "npm run build && node --test test/migrations.e2e.cjs"
   },
   "dependencies": {

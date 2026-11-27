@@ -76,7 +76,7 @@ test('el CRUD impide borrar clientes con vehículos asociados', async () => {
   };
   const service = new ClientesService(clientesRepository, vehiculosRepository);
 
-  await assert.rejects(service.remove(clienteId), {
+  await assert.rejects(service.remove(clienteId, { id: clienteId, role: 'admin' }), {
     status: 409,
     message: 'No se puede eliminar el cliente porque tiene vehículos asociados',
   });
@@ -100,7 +100,7 @@ test('crear vehículo exige que exista el cliente asociado', async () => {
       modelo: 'Corolla',
       anio: 2020,
       clienteId,
-    }),
+    }, clienteId),
     { status: 404, message: `No existe un cliente con id ${clienteId}` },
   );
 });

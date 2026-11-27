@@ -15,6 +15,9 @@ export class OrdenReparacion {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  ownerId: string | null;
+
   // Código visible para el taller, ej. OR-2026-0001 (lo genera el service)
   @Column({ type: 'varchar', length: 20, unique: true })
   codigo: string;

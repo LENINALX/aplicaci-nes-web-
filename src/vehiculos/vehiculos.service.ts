@@ -1,3 +1,5 @@
+import { assertResourceOwner } from '../security/resource-owner';
+import { PublicUser } from '../users/users.entity';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -33,19 +35,21 @@ export class VehiculosService {
     return vehiculo;
   }
 
-  async create(createVehiculoDto: CreateVehiculoDto): Promise<Vehiculo> {
+  async create(createVehiculoDto: CreateVehiculoDto, ownerId: string): Promise<Vehiculo> {
     const cliente = await this.findCliente(createVehiculoDto.clienteId);
     const { clienteId: _clienteId, ...datosVehiculo } = createVehiculoDto;
     return this.vehiculosRepository.save(
-      this.vehiculosRepository.create({ ...datosVehiculo, cliente }),
+      this.vehiculosRepository.create({ ...datosVehiculo, cliente, ownerId }),
     );
   }
 
   async update(
     id: string,
     updateVehiculoDto: UpdateVehiculoDto,
+    actor: Pick<PublicUser, 'id' | 'role'>,
   ): Promise<Vehiculo> {
     const vehiculo = await this.findOne(id);
+    assertResourceOwner(vehiculo.ownerId, actor);
     const { clienteId, ...datosVehiculo } = updateVehiculoDto;
     this.vehiculosRepository.merge(vehiculo, datosVehiculo);
     if (clienteId !== undefined) {
@@ -54,8 +58,9 @@ export class VehiculosService {
     return this.vehiculosRepository.save(vehiculo);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, actor: Pick<PublicUser, 'id' | 'role'>): Promise<void> {
     const vehiculo = await this.findOne(id);
+    assertResourceOwner(vehiculo.ownerId, actor);
     await this.vehiculosRepository.remove(vehiculo);
   }
 

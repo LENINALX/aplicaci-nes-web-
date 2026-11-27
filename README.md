@@ -2,6 +2,10 @@
 
 API REST para administrar clientes, vehículos y órdenes de reparación de talleres de enderezada y pintura. Está construida con NestJS, PostgreSQL, TypeORM y `class-validator`.
 
+## Autorización de la etapa 3
+
+Consulta la [matriz de roles y guía de verificación](docs/matriz-roles-etapa-3.md) para crear el admin inicial, probar los roles y conocer los cambios en los listados.
+
 ## Etapa 1: API base y módulo de órdenes
 
 La primera etapa estableció la API del proyecto AutoBodyOps con NestJS y PostgreSQL. Su recurso principal es la orden de reparación, que permite registrar y consultar los datos de un vehículo, el cliente, el servicio solicitado, su estado, costo y fechas.

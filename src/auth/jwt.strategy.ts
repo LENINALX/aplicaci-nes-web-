@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { isUUID } from 'class-validator';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Role } from '../common/enums/role.enum';
 import { PublicUser } from '../users/users.entity';
 import { UsersService } from '../users/users.service';
 
@@ -10,6 +11,7 @@ import { UsersService } from '../users/users.service';
 export interface JwtPayload {
   sub: string;
   email: string;
+  role: Role;
   iat?: number;
   exp?: number;
 }

@@ -8,6 +8,7 @@ const { ConfigModule, ConfigService } = require('@nestjs/config');
 const { JwtService } = require('@nestjs/jwt');
 const { getDataSourceToken } = require('@nestjs/typeorm');
 const { AuthModule } = require('../dist/auth/auth.module');
+const { UsersService } = require('../dist/users/users.service');
 const { JwtAuthGuard } = require('../dist/security/jwt-auth.guard');
 
 const secret = 'only-for-tests-secret-at-least-32-characters';
@@ -23,7 +24,7 @@ function fakeUsersRepository() {
     existsBy: async ({ email }) => [...rows.values()].some((u) => u.email === email),
     save: async (entity) => {
       const now = new Date();
-      const row = { id: randomUUID(), tenantId: 'default', createdAt: now, updatedAt: now, ...entity };
+      const row = { id: randomUUID(), tenantId: 'default', role: 'user', createdAt: now, updatedAt: now, ...entity };
       rows.set(row.id, row);
       return { ...row };
     },
@@ -70,7 +71,7 @@ async function startApp(t, env = {}) {
     const text = await response.text();
     return { status: response.status, body: text ? JSON.parse(text) : undefined };
   };
-  return { request, repository };
+  return { request, repository, app };
 }
 
 const nuevo = { nombre: 'Ana Pérez', email: '  Ana@Taller.com ', password: 'clave-segura-123' };
@@ -121,6 +122,7 @@ test('login: emite JWT HS256 con sub, email y expiración', async (t) => {
   assert.equal(decoded.header.alg, 'HS256');
   assert.equal(decoded.payload.sub, user.id);
   assert.equal(decoded.payload.email, 'ana@taller.com');
+  assert.equal(decoded.payload.role, 'user');
   assert.equal(decoded.payload.exp - decoded.payload.iat, 3600);
   assert.equal(decoded.payload.passwordHash, undefined);
   jwt.verify(res.body.access_token, { algorithms: ['HS256'] });
@@ -174,10 +176,10 @@ test('profile: JwtStrategy exige un token válido de un usuario existente', asyn
 });
 
 test('el token del login es aceptado por JwtAuthGuard del integrante 2', async (t) => {
-  const { request } = await startApp(t);
+  const { request, app } = await startApp(t);
   await request('POST', '/auth/register', nuevo);
   const { body } = await request('POST', '/auth/login', credenciales);
-  const guard = new JwtAuthGuard(jwt, new ConfigService({ JWT_SECRET: secret }));
+  const guard = new JwtAuthGuard(jwt, new ConfigService({ JWT_SECRET: secret }), app.get(UsersService));
   const req = { headers: { authorization: `Bearer ${body.access_token}` } };
   assert.equal(await guard.canActivate({ switchToHttp: () => ({ getRequest: () => req }) }), true);
   assert.equal(req.user.email, 'ana@taller.com');
