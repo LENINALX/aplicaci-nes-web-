@@ -1,3 +1,7 @@
+import { Role } from '../common/enums/role.enum';
+import { Roles } from '../security/roles.decorator';
+import { RolesGuard } from '../security/roles.guard';
+import { PublicUser } from '../users/users.entity';
 import { JwtAuthGuard } from '../security/jwt-auth.guard';
 import {
   Body,
@@ -10,6 +14,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { CreateClienteDto } from './dto/create-cliente.dto';
@@ -21,6 +26,8 @@ export class ClientesController {
   constructor(private readonly clientesService: ClientesService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   findAll() {
     return this.clientesService.findAll();
   }
@@ -36,24 +43,34 @@ export class ClientesController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  create(@Body() createClienteDto: CreateClienteDto) {
-    return this.clientesService.create(createClienteDto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  create(
+    @Body() createClienteDto: CreateClienteDto,
+    @Req() request: { user: PublicUser },
+  ) {
+    return this.clientesService.create(createClienteDto, request.user.id);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
   update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() updateClienteDto: UpdateClienteDto,
+    @Req() request: { user: PublicUser },
   ) {
-    return this.clientesService.update(id, updateClienteDto);
+    return this.clientesService.update(id, updateClienteDto, request.user);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.clientesService.remove(id);
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Req() request: { user: PublicUser },
+  ) {
+    return this.clientesService.remove(id, request.user);
   }
 }

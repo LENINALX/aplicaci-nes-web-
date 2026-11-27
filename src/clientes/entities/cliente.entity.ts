@@ -13,6 +13,9 @@ export class Cliente {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  ownerId: string | null;
+
   @Column({ type: 'varchar', length: 100 })
   nombreCompleto: string;
 

@@ -7,6 +7,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+import { Role } from '../common/enums/role.enum';
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -22,6 +24,9 @@ export class User {
   // Hash bcrypt (60 caracteres). select: false evita devolverlo en las consultas.
   @Column({ type: 'varchar', length: 60, select: false })
   passwordHash: string;
+
+  @Column({ type: 'enum', enum: Role, enumName: 'user_role', default: Role.USER })
+  role: Role;
 
   // Semilla SaaS: cada taller será un tenant
   @Index()

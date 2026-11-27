@@ -1,9 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Module, ValidationPipe } = require('@nestjs/common');
+const { Global, Module, ValidationPipe } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
 const { ConfigModule, ConfigService } = require('@nestjs/config');
 const { JwtService } = require('@nestjs/jwt');
+const { getDataSourceToken } = require('@nestjs/typeorm');
 const { SecurityModule } = require('../dist/security/security.module');
 const { JwtAuthGuard } = require('../dist/security/jwt-auth.guard');
 const { OrdenesController } = require('../dist/ordenes/ordenes.controller');
@@ -12,6 +13,7 @@ const { OrdenesService } = require('../dist/ordenes/ordenes.service');
 const secret = 'only-for-tests-secret-at-least-32-characters';
 const jwt = new JwtService({ secret });
 const id = '00000000-0000-4000-8000-000000000001';
+const user = { id, role: 'user' };
 const body = {
   placaVehiculo: 'ABC123', marca: 'Toyota', modelo: 'Corolla', anio: 2020,
   nombreCliente: 'Ana Pérez', telefonoCliente: '+593991234567',
@@ -26,9 +28,23 @@ test('HTTP: protección real de órdenes con JWT (servicio de datos simulado)', 
     update: (id, data) => { writes++; return { id, ...data }; },
     remove: () => { writes++; },
   };
+  class FakeDataSourceModule {}
+  Module({
+    providers: [{
+      provide: getDataSourceToken(),
+      useValue: {
+        entityMetadatas: [],
+        options: { type: 'postgres' },
+        getRepository: () => ({ findOneBy: ({ id: subject }) => subject === id ? user : null }),
+      },
+    }],
+    exports: [getDataSourceToken()],
+  })(FakeDataSourceModule);
+  Global()(FakeDataSourceModule);
+
   class TestAppModule {}
   Module({
-    imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, skipProcessEnv: true, load: [() => ({ JWT_SECRET: secret })] }), SecurityModule],
+    imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, skipProcessEnv: true, load: [() => ({ JWT_SECRET: secret })] }), FakeDataSourceModule, SecurityModule],
     controllers: [OrdenesController],
     providers: [{ provide: OrdenesService, useValue: service }],
   })(TestAppModule);
@@ -41,7 +57,7 @@ test('HTTP: protección real de órdenes con JWT (servicio de datos simulado)', 
     method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}) },
     body: data === undefined ? undefined : JSON.stringify(data),
   });
-  assert.equal((await request('GET', '/ordenes')).status, 200);
+  assert.equal((await request('GET', '/ordenes')).status, 401);
   assert.equal((await request('GET', `/ordenes/${id}`)).status, 200);
   const invalid = [
     undefined, 'Basic abc', 'Bearer basura',
@@ -58,6 +74,8 @@ test('HTTP: protección real de órdenes con JWT (servicio de datos simulado)', 
   }
   assert.equal(writes, 0, 'peticiones rechazadas no llegan al servicio');
   const token = `Bearer ${jwt.sign({ sub: id }, { expiresIn: 60 })}`;
+  const staleAdminToken = `Bearer ${jwt.sign({ sub: id, role: 'admin' }, { expiresIn: 60 })}`;
+  assert.equal((await request('GET', '/ordenes', staleAdminToken)).status, 403);
   assert.equal((await request('POST', '/ordenes', token, body)).status, 201);
   assert.equal((await request('PATCH', `/ordenes/${id}`, token, { estado: 'LISTO' })).status, 200);
   assert.equal((await request('DELETE', `/ordenes/${id}`, token)).status, 204);
@@ -66,8 +84,8 @@ test('HTTP: protección real de órdenes con JWT (servicio de datos simulado)', 
 });
 
 test('el guard permite que los controladores lean request.user', async () => {
-  const guard = new JwtAuthGuard(jwt, new ConfigService({ JWT_SECRET: secret }));
+  const guard = new JwtAuthGuard(jwt, new ConfigService({ JWT_SECRET: secret }), { findById: async () => user });
   const request = { headers: { authorization: `Bearer ${jwt.sign({ sub: id }, { expiresIn: 60 })}` } };
   assert.equal(await guard.canActivate({ switchToHttp: () => ({ getRequest: () => request }) }), true);
-  assert.equal(request.user.sub, id);
+  assert.equal(request.user.id, id);
 });

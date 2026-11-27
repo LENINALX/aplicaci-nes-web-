@@ -1,12 +1,15 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { isUUID } from 'class-validator';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly usersService: UsersService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -18,20 +21,24 @@ export class JwtAuthGuard implements CanActivate {
     if (!match) throw new UnauthorizedException('Se requiere un token Bearer.');
 
     const secret = this.config.getOrThrow<string>('JWT_SECRET');
+    let payload: { sub?: string; exp?: number };
     try {
-      const payload = await this.jwtService.verifyAsync(match[1], {
+      payload = await this.jwtService.verifyAsync(match[1], {
         secret,
         algorithms: ['HS256'],
       });
-      // Contrato con Auth: sub identifica al usuario y exp limita la sesión.
-      if (typeof payload.sub !== 'string' || !payload.sub.trim() ||
-          !Number.isInteger(payload.exp)) {
-        throw new Error('Token sin identidad o expiración.');
-      }
-      request.user = payload;
-      return true;
     } catch {
       throw new UnauthorizedException('Token inválido o expirado.');
     }
+
+    if (typeof payload.sub !== 'string' || !isUUID(payload.sub) || !Number.isInteger(payload.exp)) {
+      throw new UnauthorizedException('Token sin identidad o expiración.');
+    }
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('El usuario del token ya no existe.');
+    }
+    request.user = user;
+    return true;
   }
 }

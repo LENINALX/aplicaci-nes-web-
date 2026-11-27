@@ -76,9 +76,38 @@ test('PostgreSQL real: migraciones reversibles y JWT del login en todos los CRUD
   assert.equal(login.status, 200);
   const { access_token: token } = await login.json();
   assert.ok(token);
+  const env = {
+    ...process.env,
+    ADMIN_EMAIL: 'admin@example.com',
+    ADMIN_PASSWORD: randomBytes(24).toString('hex'),
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const seed = spawnSync(process.execPath, ['dist/scripts/seed-admin.js'], {
+      env, encoding: 'utf8', timeout: 30000,
+    });
+    assert.equal(seed.status, 0, seed.stderr);
+  }
+  const adminLogin = await request('POST', '/auth/login', {
+    email: env.ADMIN_EMAIL, password: env.ADMIN_PASSWORD,
+  });
+  assert.equal(adminLogin.status, 200);
+  const { access_token: adminToken } = await adminLogin.json();
+  const otherCredentials = { email: 'otra@example.com', password: 'ClavePrueba123!' };
+  assert.equal((await request('POST', '/auth/register', { nombre: 'Otra cuenta', ...otherCredentials })).status, 201);
+  const otherLogin = await request('POST', '/auth/login', otherCredentials);
+  assert.equal(otherLogin.status, 200);
+  const { access_token: otherToken } = await otherLogin.json();
   const id = '00000000-0000-4000-8000-000000000001';
   for (const path of ['/ordenes', '/clientes', '/vehiculos']) {
-    assert.equal((await request('GET', path)).status, 200);
+    assert.equal((await request('GET', path)).status, 401);
+    assert.equal((await request('GET', path, undefined, token)).status, 403);
+    const list = await request('GET', path, undefined, adminToken);
+    assert.equal(list.status, 200);
+    if (path === '/ordenes') {
+      const body = await list.json();
+      assert.ok(Array.isArray(body.data));
+      assert.deepEqual(Object.keys(body.meta).sort(), ['limit', 'page', 'totalItems', 'totalPages']);
+    }
     for (const badToken of [undefined, 'invalido']) {
       for (const [method, target] of [['POST', path], ['PATCH', `${path}/${id}`], ['DELETE', `${path}/${id}`]]) {
         assert.equal((await request(method, target, method === 'DELETE' ? undefined : {}, badToken)).status, 401, `${method} ${target}`);
@@ -95,7 +124,13 @@ test('PostgreSQL real: migraciones reversibles y JWT del login en todos los CRUD
   assert.equal(ordenResponse.status, 201);
   const orden = await ordenResponse.json();
   const records = [['/ordenes', orden.id, { estado: 'LISTO' }], ['/vehiculos', vehiculo.id, { modelo: 'Yaris' }], ['/clientes', cliente.id, { nombreCompleto: 'Ana Actualizada' }]];
-  for (const [path, id, patch] of records) assert.equal((await request('PATCH', `${path}/${id}`, patch, token)).status, 200);
+  for (const [path, id, patch] of records) {
+    const target = `${path}/${id}`;
+    assert.equal((await request('PATCH', target, patch, otherToken)).status, 403);
+    assert.equal((await request('DELETE', target, undefined, otherToken)).status, 403);
+    assert.equal((await request('PATCH', target, patch, token)).status, 200);
+    assert.equal((await request('PATCH', target, patch, adminToken)).status, 200);
+  }
   await app.close();
   app = undefined;
   base = await start();
@@ -104,7 +139,7 @@ test('PostgreSQL real: migraciones reversibles y JWT del login en todos los CRUD
     assert.equal(response.status, 200);
     const saved = await response.json();
     for (const [key, value] of Object.entries(patch)) assert.equal(saved[key], value);
-    assert.equal((await request('DELETE', `${path}/${id}`, undefined, token)).status, 204);
+    assert.equal((await request('DELETE', `${path}/${id}`, undefined, path === '/ordenes' ? adminToken : token)).status, 204);
   }
   t.diagnostic('Login real, 401 sin credenciales, POST 201, PATCH 200, DELETE 204 y persistencia tras reiniciar: correctos en órdenes, clientes y vehículos.');
 });

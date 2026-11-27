@@ -14,6 +14,9 @@ export class Vehiculo {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  ownerId: string | null;
+
   @Column({ type: 'varchar', length: 10, unique: true })
   placa: string;
 

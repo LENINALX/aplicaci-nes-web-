@@ -1,3 +1,5 @@
+import { assertResourceOwner } from '../security/resource-owner';
+import { PublicUser } from '../users/users.entity';
 import {
   ConflictException,
   Injectable,
@@ -39,23 +41,26 @@ export class ClientesService {
     });
   }
 
-  create(createClienteDto: CreateClienteDto): Promise<Cliente> {
+  create(createClienteDto: CreateClienteDto, ownerId: string): Promise<Cliente> {
     return this.clientesRepository.save(
-      this.clientesRepository.create(createClienteDto),
+      this.clientesRepository.create({ ...createClienteDto, ownerId }),
     );
   }
 
   async update(
     id: string,
     updateClienteDto: UpdateClienteDto,
+    actor: Pick<PublicUser, 'id' | 'role'>,
   ): Promise<Cliente> {
     const cliente = await this.findOne(id);
+    assertResourceOwner(cliente.ownerId, actor);
     this.clientesRepository.merge(cliente, updateClienteDto);
     return this.clientesRepository.save(cliente);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, actor: Pick<PublicUser, 'id' | 'role'>): Promise<void> {
     const cliente = await this.findOne(id);
+    assertResourceOwner(cliente.ownerId, actor);
     const tieneVehiculos = await this.vehiculosRepository.exist({
       where: { cliente: { id } },
     });

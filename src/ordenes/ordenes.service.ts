@@ -1,3 +1,5 @@
+import { assertResourceOwner } from '../security/resource-owner';
+import { PublicUser } from '../users/users.entity';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
@@ -90,10 +92,11 @@ export class OrdenesService {
 		return orden;
 	}
 
-	create(createOrdenDto: CreateOrdenDto): Promise<OrdenReparacion> {
+	create(createOrdenDto: CreateOrdenDto, ownerId: string): Promise<OrdenReparacion> {
 		const year = new Date().getFullYear();
 		const orden = this.ordenesRepository.create({
 			...createOrdenDto,
+			ownerId,
 			codigo: `OR-${year}-${randomUUID().slice(0, 8).toUpperCase()}`,
 		});
 		return this.ordenesRepository.save(orden);
@@ -102,14 +105,17 @@ export class OrdenesService {
 	async update(
 		id: string,
 		updateOrdenDto: UpdateOrdenDto,
+		actor: Pick<PublicUser, 'id' | 'role'>,
 	): Promise<OrdenReparacion> {
 		const orden = await this.findOne(id);
+		assertResourceOwner(orden.ownerId, actor);
 		this.ordenesRepository.merge(orden, updateOrdenDto);
 		return this.ordenesRepository.save(orden);
 	}
 
-	async remove(id: string): Promise<void> {
+	async remove(id: string, actor: Pick<PublicUser, 'id' | 'role'>): Promise<void> {
 		const orden = await this.findOne(id);
+		assertResourceOwner(orden.ownerId, actor);
 		await this.ordenesRepository.remove(orden);
 	}
 }
